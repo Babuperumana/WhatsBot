@@ -1,0 +1,78 @@
+/* Copyright (C) 2020 Babu Perumana.
+
+Licensed under the  GPL-3.0 License;
+you may not use this file except in compliance with the License.
+
+WhatsBot - Babu Perumana
+*/
+
+const Asena = require('../events');
+const {MessageType} = require('@adiwajshing/baileys');
+
+const Language = require('../language');
+const Lang = Language.getString('afk');
+
+var AFK = {
+    isAfk: false,
+    reason: false,
+    lastseen: 0
+};
+
+// https://stackoverflow.com/a/37096512
+function secondsToHms(d) {
+    d = Number(d);
+    var h = Math.floor(d / 3600);
+    var m = Math.floor(d % 3600 / 60);
+    var s = Math.floor(d % 3600 % 60);
+
+    var hDisplay = h > 0 ? h + (h == 1 ? " hour, " : " hour, ") : "";
+    var mDisplay = m > 0 ? m + (m == 1 ? " minute, " : " minute, ") : "";
+    var sDisplay = s > 0 ? s + (s == 1 ? " second" : " second") : "";
+    return hDisplay + mDisplay + sDisplay; 
+}
+
+Asena.addCommand({on: 'text', fromMe: false, deleteCommand: false}, (async (message, match) => {   
+    if (AFK.isAfk && ((!message.jid.includes('-')) || (message.jid.includes('-') && 
+        (( message.mention !== false && message.mention.length !== 0 ) || message.reply_message !== false)))) {
+        if (message.jid.includes('-') && (message.mention !== false && message.mention.length !== 0)) {
+            message.mention.map(async (jid) => {
+                if (message.client.user.jid.split('@')[0] === jid.split('@')[0]) {
+                    await message.sendMessage(Lang.AFK_TEXT + '\n' + 
+                    (AFK.reason !== false ? '\n*' + Lang.AFK_TEXT + ':* ```' + AFK.reason + '```' : '') + 
+                    (AFK.lastseen !== 0 ? '\n*' + Lang.LAST_SEEN + ':* ```' + secondsToHms(Math.round((new Date()).getTime() / 1000) - AFK.lastseen) + ' before```' : ''), MessageType.text, {quoted: message.data});            
+                }
+            })
+        } else if (message.jid.includes('-') && message.reply_message !== false) {
+            if (message.reply_message.jid.split('@')[0] === message.client.user.jid.split('@')[0]) {
+                await message.sendMessage(Lang.AFK_TEXT + '\n' + 
+                    (AFK.reason !== false ? '\n*' + Lang.AFK_TEXT + ':* ```' + AFK.reason + '```' : '') + 
+                    (AFK.lastseen !== 0 ? '\n*' + Lang.LAST_SEEN + ':* ```' + secondsToHms(Math.round((new Date()).getTime() / 1000) - AFK.lastseen) + ' before```' : ''), MessageType.text, {quoted: message.data});
+            }
+        } else {
+            await message.sendMessage(Lang.AFK_TEXT + '\n' + 
+            (AFK.reason !== false ? '\n*' + Lang.AFK_TEXT + ':* ```' + AFK.reason + '```' : '') + 
+            (AFK.lastseen !== 0 ? '\n*' + Lang.LAST_SEEN + ':* ```' + secondsToHms(Math.round((new Date()).getTime() / 1000) - AFK.lastseen) + ' before```' : ''), MessageType.text, {quoted: message.data});    
+        }
+    }
+}));
+
+Asena.addCommand({on: 'text', fromMe: true, deleteCommand: false}, (async (message, match) => {
+    if (AFK.isAfk && !message.message.includes(Lang.IM_AFK_NOMD) && !message.message.includes(Lang.AFK_TEXT_NOMD) &&  !message.message.includes('*-- ERROR REPORT [WHATSBOT] --*') && !message.message.includes('ERROR REPORT [WHATSBOT]')) {
+        AFK.lastseen = 0;
+        AFK.reason = false;
+        AFK.isAfk = false;
+
+        await message.sendMessage(Lang.IM_NOT_AFK);
+    }
+}));
+
+Asena.addCommand({pattern: 'afk ?(.*)', fromMe: true, deleteCommand: false, desc: Lang.AFK_DESC}, (async (message, match) => {     
+    if (!AFK.isAfk) {
+        AFK.lastseen = Math.round((new Date()).getTime() / 1000);
+        if (match[1] !== '') { AFK.reason = match[1]; }
+        AFK.isAfk = true;
+
+        await message.sendMessage(Lang.IM_AFK + (AFK.reason !== false ? ('\n*' + Lang.REASON +':* ```' + AFK.reason + '```') : ''));
+    }
+}));
+
